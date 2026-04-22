@@ -14,7 +14,12 @@ import {
   LineController,
 } from 'chart.js';
 import { listExpenses } from '../db.js';
-import { formatCurrency, monthKey, dayKey, recordsLabel } from '../format.js';
+import {
+  formatCurrency,
+  recordsLabel,
+  formatDayChart,
+  formatMonthChart,
+} from '../format.js';
 
 Chart.register(
   ArcElement,
@@ -36,13 +41,36 @@ const PALETTE = [
   '#a78bfa', '#fb7185', '#60a5fa', '#f87171', '#4ade80',
 ];
 
-function rangeFor(preset) {
+const DAY_MS = 86_400_000;
+
+function startOfDay(t) {
+  const d = new Date(t);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+function startOfMonth(t) {
+  const d = new Date(t);
+  return new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+}
+function toIsoDate(t) {
+  const d = new Date(t);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+function rangeFor(preset, fromISO, toISO) {
   const now = new Date();
   const y = now.getFullYear();
   const m = now.getMonth();
   if (preset === 'month') return { from: new Date(y, m, 1).getTime(), to: Date.now() };
   if (preset === '3m') return { from: new Date(y, m - 2, 1).getTime(), to: Date.now() };
   if (preset === 'year') return { from: new Date(y, 0, 1).getTime(), to: Date.now() };
+  if (preset === 'custom') {
+    const from = fromISO ? new Date(fromISO + 'T00:00:00').getTime() : undefined;
+    const to = toISO ? new Date(toISO + 'T23:59:59.999').getTime() : undefined;
+    return { from, to };
+  }
   return {};
 }
 
@@ -56,7 +84,12 @@ export function renderAnalytics(root) {
           <option value="3m" selected>Последние 3 месяца</option>
           <option value="year">Этот год</option>
           <option value="all">За всё время</option>
+          <option value="custom">Свой период</option>
         </select>
+      </div>
+      <div id="a-custom" class="custom-range" hidden>
+        <label>С <input id="a-from" type="date" /></label>
+        <label>По <input id="a-to" type="date" /></label>
       </div>
       <div id="a-total" class="total"></div>
       <div class="chart-grid">
@@ -82,12 +115,19 @@ export function renderAnalytics(root) {
   `;
 
   const rangeEl = root.querySelector('#a-range');
+  const customEl = root.querySelector('#a-custom');
+  const fromEl = root.querySelector('#a-from');
+  const toEl = root.querySelector('#a-to');
   const emptyEl = root.querySelector('#a-empty');
   const totalEl = root.querySelector('#a-total');
   const charts = {};
 
   async function refresh() {
-    const rows = await listExpenses(rangeFor(rangeEl.value));
+    const isCustom = rangeEl.value === 'custom';
+    customEl.hidden = !isCustom;
+    const rows = await listExpenses(
+      rangeFor(rangeEl.value, fromEl.value, toEl.value),
+    );
     const hasData = rows.length > 0;
     emptyEl.hidden = hasData;
     root.querySelector('.chart-grid').style.display = hasData ? '' : 'none';
@@ -148,14 +188,15 @@ export function renderAnalytics(root) {
   function drawTime(rows) {
     const sorted = [...rows].sort((a, b) => a.createdAt - b.createdAt);
     const spanMs = sorted[sorted.length - 1].createdAt - sorted[0].createdAt;
-    const useMonth = spanMs > 1000 * 60 * 60 * 24 * 90;
+    const useMonth = spanMs > DAY_MS * 90;
     const buckets = new Map();
     for (const r of sorted) {
-      const k = useMonth ? monthKey(r.createdAt) : dayKey(r.createdAt);
-      buckets.set(k, (buckets.get(k) || 0) + r.price);
+      const key = useMonth ? startOfMonth(r.createdAt) : startOfDay(r.createdAt);
+      buckets.set(key, (buckets.get(key) || 0) + r.price);
     }
-    const labels = [...buckets.keys()];
-    const data = labels.map((k) => Number(buckets.get(k).toFixed(2)));
+    const keys = [...buckets.keys()].sort((a, b) => a - b);
+    const labels = keys.map((k) => (useMonth ? formatMonthChart(k) : formatDayChart(k)));
+    const data = keys.map((k) => Number(buckets.get(k).toFixed(2)));
     upsert('time', 'c-time', {
       type: 'line',
       data: {
@@ -189,11 +230,12 @@ export function renderAnalytics(root) {
   function drawMonthly(rows) {
     const totals = new Map();
     for (const r of rows) {
-      const k = monthKey(r.createdAt);
-      totals.set(k, (totals.get(k) || 0) + r.price);
+      const key = startOfMonth(r.createdAt);
+      totals.set(key, (totals.get(key) || 0) + r.price);
     }
-    const labels = [...totals.keys()].sort();
-    const data = labels.map((k) => Number(totals.get(k).toFixed(2)));
+    const keys = [...totals.keys()].sort((a, b) => a - b);
+    const labels = keys.map((k) => formatMonthChart(k));
+    const data = keys.map((k) => Number(totals.get(k).toFixed(2)));
     upsert('month', 'c-month', {
       type: 'bar',
       data: {
@@ -256,7 +298,16 @@ export function renderAnalytics(root) {
     });
   }
 
-  rangeEl.addEventListener('change', refresh);
+  rangeEl.addEventListener('change', () => {
+    if (rangeEl.value === 'custom' && !fromEl.value && !toEl.value) {
+      const now = new Date();
+      fromEl.value = toIsoDate(new Date(now.getFullYear(), now.getMonth(), 1));
+      toEl.value = toIsoDate(now);
+    }
+    refresh();
+  });
+  fromEl.addEventListener('change', refresh);
+  toEl.addEventListener('change', refresh);
   refresh();
 
   return () => {

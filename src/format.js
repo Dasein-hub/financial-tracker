@@ -20,9 +20,21 @@ const dateTimeFmt = new Intl.DateTimeFormat('ru-RU', {
 
 const pluralRecord = new Intl.PluralRules('ru-RU');
 
+const dayChartFmt = new Intl.DateTimeFormat('ru-RU', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
+const monthChartFmt = new Intl.DateTimeFormat('ru-RU', {
+  month: '2-digit',
+  year: 'numeric',
+});
+
 export const formatCurrency = (n) => currencyFmt.format(Number(n) || 0);
 export const formatDate = (t) => dateFmt.format(new Date(t));
 export const formatDateTime = (t) => dateTimeFmt.format(new Date(t));
+export const formatDayChart = (t) => dayChartFmt.format(new Date(t));
+export const formatMonthChart = (t) => monthChartFmt.format(new Date(t));
 
 export function recordsLabel(n) {
   const r = pluralRecord.select(n);
