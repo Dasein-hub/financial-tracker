@@ -322,20 +322,22 @@ select.filter {
 
 /* Custom date range */
 .custom-range {
-  display: grid;
-  grid-template-columns: auto auto;
-  justify-content: start;
-  gap: 8px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
   align-items: center;
   margin-bottom: 12px;
 }
+.custom-range[hidden] { display: none; }
 .custom-range label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--muted);
   font-size: 13px;
-  justify-self: start;
 }
 .custom-range input[type="date"] {
-  width: 150px;
+  width: 130px;
   background: var(--bg-elev-2);
   color: var(--fg);
   border: 1px solid var(--border);

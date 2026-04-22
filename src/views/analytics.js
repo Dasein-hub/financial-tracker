@@ -63,6 +63,19 @@ function rangeFor(preset, fromISO, toISO) {
   const now = new Date();
   const y = now.getFullYear();
   const m = now.getMonth();
+  const d = now.getDate();
+  if (preset === 'today') {
+    const lo = new Date(y, m, d).getTime();
+    return { from: lo, to: lo + DAY_MS - 1 };
+  }
+  if (preset === 'week') {
+    const daysToMonday = (now.getDay() + 6) % 7;
+    const monday = new Date(y, m, d - daysToMonday);
+    const sundayEnd = new Date(monday);
+    sundayEnd.setDate(sundayEnd.getDate() + 6);
+    sundayEnd.setHours(23, 59, 59, 999);
+    return { from: monday.getTime(), to: sundayEnd.getTime() };
+  }
   if (preset === 'month') return { from: new Date(y, m, 1).getTime(), to: Date.now() };
   if (preset === '3m') return { from: new Date(y, m - 2, 1).getTime(), to: Date.now() };
   if (preset === 'year') return { from: new Date(y, 0, 1).getTime(), to: Date.now() };
@@ -80,6 +93,8 @@ export function renderAnalytics(root) {
       <div class="row">
         <h2>Аналитика</h2>
         <select id="a-range" class="filter">
+          <option value="today">Сегодня</option>
+          <option value="week">На этой неделе</option>
           <option value="month">Этот месяц</option>
           <option value="3m" selected>Последние 3 месяца</option>
           <option value="year">Этот год</option>
@@ -88,10 +103,8 @@ export function renderAnalytics(root) {
         </select>
       </div>
       <div id="a-custom" class="custom-range" hidden>
-        <label for="a-from">С</label>
-        <input id="a-from" type="date" />
-        <label for="a-to">По</label>
-        <input id="a-to" type="date" />
+        <label>С <input id="a-from" type="date" /></label>
+        <label>По <input id="a-to" type="date" /></label>
       </div>
       <div id="a-total" class="total"></div>
       <div class="chart-grid">
