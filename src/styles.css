@@ -73,6 +73,7 @@ body {
   max-width: 880px;
   margin: 0 auto;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -136,6 +137,8 @@ body {
 .filter,
 select.filter,
 .row-edit input {
+  width: 100%;
+  min-width: 0;
   background: var(--bg-elev-2);
   color: var(--fg);
   border: 1px solid var(--border);

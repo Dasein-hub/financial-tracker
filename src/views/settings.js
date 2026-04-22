@@ -1,24 +1,25 @@
 import { clearAll, exportJSON, importJSON, listExpenses } from '../db.js';
+import { recordsLabel } from '../format.js';
 
 export function renderSettings(root, { onDataChange, toast }) {
   root.innerHTML = `
     <section class="card">
-      <h2>Data</h2>
+      <h2>Данные</h2>
       <p class="muted" id="s-count"></p>
       <div class="settings-actions">
-        <button id="s-export">Export JSON</button>
+        <button id="s-export">Экспорт JSON</button>
         <label class="file-btn">
-          Import JSON
+          Импорт JSON
           <input id="s-import" type="file" accept="application/json,.json" hidden />
         </label>
-        <button id="s-clear" class="danger">Clear all data</button>
+        <button id="s-clear" class="danger">Очистить все данные</button>
       </div>
     </section>
     <section class="card">
-      <h2>About</h2>
+      <h2>О приложении</h2>
       <p class="muted">
-        100% offline. Data is stored in your browser via IndexedDB.
-        Installing as an app keeps it on your device.
+        Работает полностью офлайн. Данные хранятся в браузере через IndexedDB.
+        Установите как приложение, чтобы они всегда были под рукой.
       </p>
     </section>
   `;
@@ -30,7 +31,7 @@ export function renderSettings(root, { onDataChange, toast }) {
 
   async function refreshCount() {
     const rows = await listExpenses();
-    countEl.textContent = `${rows.length} entries stored.`;
+    countEl.textContent = `Сохранено: ${rows.length} ${recordsLabel(rows.length)}.`;
   }
 
   exportBtn.addEventListener('click', async () => {
@@ -39,7 +40,7 @@ export function renderSettings(root, { onDataChange, toast }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `financial-tracker-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `raskhody-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   });
@@ -47,27 +48,27 @@ export function renderSettings(root, { onDataChange, toast }) {
   importInput.addEventListener('change', async () => {
     const file = importInput.files?.[0];
     if (!file) return;
-    if (!confirm('Importing replaces all existing data. Continue?')) {
+    if (!confirm('Импорт заменит все текущие данные. Продолжить?')) {
       importInput.value = '';
       return;
     }
     try {
       const text = await file.text();
       const n = await importJSON(text);
-      toast(`Imported ${n} entries.`);
+      toast(`Импортировано: ${n} ${recordsLabel(n)}.`);
       onDataChange?.();
       await refreshCount();
     } catch (e) {
-      toast('Import failed: ' + e.message);
+      toast('Ошибка импорта: ' + e.message);
     } finally {
       importInput.value = '';
     }
   });
 
   clearBtn.addEventListener('click', async () => {
-    if (!confirm('Delete ALL expense data? This cannot be undone.')) return;
+    if (!confirm('Удалить ВСЕ данные? Это действие нельзя отменить.')) return;
     await clearAll();
-    toast('All data cleared.');
+    toast('Все данные удалены.');
     onDataChange?.();
     await refreshCount();
   });

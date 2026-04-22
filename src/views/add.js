@@ -5,25 +5,25 @@ import { formatCurrency, formatDateTime } from '../format.js';
 export function renderAdd(root, { onDataChange, toast }) {
   root.innerHTML = `
     <section class="card">
-      <h2>New expense</h2>
+      <h2>Новый расход</h2>
       <form id="entry-form" class="entry-form" autocomplete="off" novalidate>
         <label class="field">
-          <span>Name</span>
-          <input id="f-name" type="text" placeholder="e.g. Coffee" required />
+          <span>Название</span>
+          <input id="f-name" type="text" placeholder="напр. Кофе" required />
         </label>
         <label class="field">
-          <span>Category</span>
-          <input id="f-category" type="text" placeholder="e.g. Food" required />
+          <span>Категория</span>
+          <input id="f-category" type="text" placeholder="напр. Еда" required />
         </label>
         <label class="field">
-          <span>Price</span>
-          <input id="f-price" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" required />
+          <span>Цена</span>
+          <input id="f-price" type="number" inputmode="decimal" step="1" min="0" placeholder="0" required />
         </label>
-        <button type="submit" class="primary">Add</button>
+        <button type="submit" class="primary">Добавить</button>
       </form>
     </section>
     <section class="card">
-      <h2>Recent</h2>
+      <h2>Недавние</h2>
       <ul id="recent-list" class="recent-list"></ul>
     </section>
   `;
@@ -72,14 +72,14 @@ export function renderAdd(root, { onDataChange, toast }) {
     const category = catInput.value.trim();
     const price = Number(priceInput.value);
     if (!name || !category || !Number.isFinite(price) || price < 0) {
-      toast('Fill in all fields with a valid price.');
+      toast('Заполните все поля и укажите корректную цену.');
       return;
     }
     await addExpense({ name, category, price });
     form.reset();
     nameMatched = false;
     nameInput.focus();
-    toast('Added.');
+    toast('Добавлено.');
     await refreshRecent();
     onDataChange?.();
   });
@@ -87,7 +87,7 @@ export function renderAdd(root, { onDataChange, toast }) {
   async function refreshRecent() {
     const rows = (await listExpenses()).slice(0, 6);
     if (rows.length === 0) {
-      recentList.innerHTML = `<li class="empty">No entries yet.</li>`;
+      recentList.innerHTML = `<li class="empty">Пока нет записей.</li>`;
       return;
     }
     recentList.innerHTML = rows

@@ -5,8 +5,8 @@ export function renderHistory(root, { onDataChange, toast }) {
   root.innerHTML = `
     <section class="card">
       <div class="row">
-        <h2>History</h2>
-        <input id="h-filter" class="filter" type="search" placeholder="Filter by name or category" />
+        <h2>История</h2>
+        <input id="h-filter" class="filter" type="search" placeholder="Поиск по названию или категории" />
       </div>
       <ul id="history-list" class="history-list"></ul>
     </section>
@@ -25,7 +25,7 @@ export function renderHistory(root, { onDataChange, toast }) {
 
   function render() {
     if (rows.length === 0) {
-      list.innerHTML = `<li class="empty">No entries match.</li>`;
+      list.innerHTML = `<li class="empty">Совпадений не найдено.</li>`;
       return;
     }
     list.innerHTML = rows.map(renderRow).join('');
@@ -37,10 +37,10 @@ export function renderHistory(root, { onDataChange, toast }) {
         <li class="row-edit" data-id="${r.id}">
           <input class="e-name" value="${escapeAttr(r.name)}" />
           <input class="e-cat"  value="${escapeAttr(r.category)}" />
-          <input class="e-price" type="number" step="0.01" min="0" value="${r.price}" />
+          <input class="e-price" type="number" step="1" min="0" value="${r.price}" />
           <div class="row-actions">
-            <button class="save">Save</button>
-            <button class="cancel">Cancel</button>
+            <button class="save">Сохранить</button>
+            <button class="cancel">Отмена</button>
           </div>
         </li>`;
     }
@@ -55,8 +55,8 @@ export function renderHistory(root, { onDataChange, toast }) {
           <span class="when">${formatDateTime(r.createdAt)}</span>
         </div>
         <div class="row-actions">
-          <button class="edit" aria-label="Edit">Edit</button>
-          <button class="del"  aria-label="Delete">Delete</button>
+          <button class="edit" aria-label="Изменить">Изменить</button>
+          <button class="del"  aria-label="Удалить">Удалить</button>
         </div>
       </li>`;
   }
@@ -76,20 +76,20 @@ export function renderHistory(root, { onDataChange, toast }) {
       const category = li.querySelector('.e-cat').value.trim();
       const price = Number(li.querySelector('.e-price').value);
       if (!name || !category || !Number.isFinite(price)) {
-        toast('Invalid values.');
+        toast('Некорректные значения.');
         return;
       }
       await updateExpense(id, { name, category, price });
       editing = null;
       await refresh();
       onDataChange?.();
-      toast('Updated.');
+      toast('Обновлено.');
     } else if (e.target.classList.contains('del')) {
-      if (!confirm('Delete this entry?')) return;
+      if (!confirm('Удалить запись?')) return;
       await deleteExpense(id);
       await refresh();
       onDataChange?.();
-      toast('Deleted.');
+      toast('Удалено.');
     }
   });
 

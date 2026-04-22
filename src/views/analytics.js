@@ -14,7 +14,7 @@ import {
   LineController,
 } from 'chart.js';
 import { listExpenses } from '../db.js';
-import { formatCurrency, monthKey, dayKey } from '../format.js';
+import { formatCurrency, monthKey, dayKey, recordsLabel } from '../format.js';
 
 Chart.register(
   ArcElement,
@@ -50,34 +50,34 @@ export function renderAnalytics(root) {
   root.innerHTML = `
     <section class="card">
       <div class="row">
-        <h2>Analytics</h2>
+        <h2>Аналитика</h2>
         <select id="a-range" class="filter">
-          <option value="month">This month</option>
-          <option value="3m" selected>Last 3 months</option>
-          <option value="year">This year</option>
-          <option value="all">All time</option>
+          <option value="month">Этот месяц</option>
+          <option value="3m" selected>Последние 3 месяца</option>
+          <option value="year">Этот год</option>
+          <option value="all">За всё время</option>
         </select>
       </div>
       <div id="a-total" class="total"></div>
       <div class="chart-grid">
         <div class="chart-card">
-          <h3>By category</h3>
+          <h3>По категориям</h3>
           <div class="chart-wrap"><canvas id="c-category"></canvas></div>
         </div>
         <div class="chart-card">
-          <h3>Over time</h3>
+          <h3>По времени</h3>
           <div class="chart-wrap"><canvas id="c-time"></canvas></div>
         </div>
         <div class="chart-card">
-          <h3>Monthly totals</h3>
+          <h3>По месяцам</h3>
           <div class="chart-wrap"><canvas id="c-month"></canvas></div>
         </div>
         <div class="chart-card">
-          <h3>Top items</h3>
+          <h3>Топ позиций</h3>
           <div class="chart-wrap"><canvas id="c-top"></canvas></div>
         </div>
       </div>
-      <p id="a-empty" class="empty" hidden>No data in this range yet.</p>
+      <p id="a-empty" class="empty" hidden>Нет данных за выбранный период.</p>
     </section>
   `;
 
@@ -93,7 +93,7 @@ export function renderAnalytics(root) {
     root.querySelector('.chart-grid').style.display = hasData ? '' : 'none';
     const total = rows.reduce((s, r) => s + r.price, 0);
     totalEl.textContent = hasData
-      ? `${rows.length} entries · ${formatCurrency(total)} total`
+      ? `${rows.length} ${recordsLabel(rows.length)} · всего ${formatCurrency(total)}`
       : '';
     if (!hasData) {
       Object.values(charts).forEach((c) => c.destroy());
