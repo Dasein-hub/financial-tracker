@@ -48,9 +48,12 @@ export async function clearAll() {
 export async function listExpenses({ from, to, textFilter } = {}) {
   let coll = db.expenses.orderBy('createdAt').reverse();
   if (from != null || to != null) {
+    const lo = from ?? 0;
+    const hi = to ?? Number.MAX_SAFE_INTEGER;
+    if (lo > hi) return [];
     coll = db.expenses
       .where('createdAt')
-      .between(from ?? 0, to ?? Number.MAX_SAFE_INTEGER, true, true)
+      .between(lo, hi, true, true)
       .reverse();
   }
   const rows = await coll.toArray();

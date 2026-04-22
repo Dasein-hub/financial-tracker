@@ -277,10 +277,14 @@ button.danger:hover { background: rgba(239, 68, 68, 0.1); }
   grid-column: 1 / -1;
   display: flex;
   justify-content: space-between;
-  gap: 6px;
+  gap: 8px;
   margin-top: 6px;
   padding-top: 8px;
   border-top: 1px solid var(--border);
+}
+.history-list li:not(.row-edit) .row-actions button {
+  flex: 1;
+  text-align: center;
 }
 
 .row-edit {
@@ -319,7 +323,8 @@ select.filter {
 /* Custom date range */
 .custom-range {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto auto;
+  justify-content: start;
   gap: 8px 10px;
   align-items: center;
   margin-bottom: 12px;
@@ -330,7 +335,7 @@ select.filter {
   justify-self: start;
 }
 .custom-range input[type="date"] {
-  width: 100%;
+  width: 150px;
   background: var(--bg-elev-2);
   color: var(--fg);
   border: 1px solid var(--border);
@@ -338,7 +343,6 @@ select.filter {
   padding: 8px 10px;
   font-size: 14px;
   color-scheme: dark;
-  min-width: 0;
 }
 .custom-range input[type="date"]:focus {
   outline: none;

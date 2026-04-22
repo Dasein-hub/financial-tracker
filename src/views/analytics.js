@@ -309,7 +309,9 @@ export function renderAnalytics(root) {
     refresh();
   });
   fromEl.addEventListener('change', refresh);
+  fromEl.addEventListener('input', refresh);
   toEl.addEventListener('change', refresh);
+  toEl.addEventListener('input', refresh);
   refresh();
 
   return () => {
