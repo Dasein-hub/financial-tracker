@@ -324,6 +324,7 @@ select.filter {
 .custom-range {
   display: flex;
   flex-wrap: wrap;
+  justify-content: space-between;
   gap: 6px 10px;
   align-items: center;
   margin-bottom: 12px;
@@ -337,13 +338,13 @@ select.filter {
   font-size: 13px;
 }
 .custom-range input[type="date"] {
-  width: 112px;
+  width: 126px;
   min-width: 0;
   background: var(--bg-elev-2);
   color: var(--fg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 8px 6px 8px 10px;
+  padding: 8px 8px 8px 10px;
   font-size: 14px;
   color-scheme: dark;
 }
