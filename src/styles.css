@@ -324,7 +324,7 @@ select.filter {
 .custom-range {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 14px;
+  gap: 6px 10px;
   align-items: center;
   margin-bottom: 12px;
 }
@@ -337,14 +337,21 @@ select.filter {
   font-size: 13px;
 }
 .custom-range input[type="date"] {
-  width: 130px;
+  width: 112px;
+  min-width: 0;
   background: var(--bg-elev-2);
   color: var(--fg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 8px 6px 8px 10px;
   font-size: 14px;
   color-scheme: dark;
+}
+.custom-range input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+.custom-range input[type="date"]::-webkit-calendar-picker-indicator {
+  margin-left: 2px;
+  padding: 0;
+  opacity: 0.7;
 }
 .custom-range input[type="date"]:focus {
   outline: none;
