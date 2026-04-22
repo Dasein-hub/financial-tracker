@@ -114,13 +114,8 @@ body {
 /* Form */
 .entry-form {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
-  align-items: end;
-}
-@media (max-width: 640px) {
-  .entry-form { grid-template-columns: 1fr 1fr; }
-  .entry-form button { grid-column: 1 / -1; }
 }
 
 .field {
@@ -281,7 +276,7 @@ button.danger:hover { background: rgba(239, 68, 68, 0.1); }
 .history-list li .row-actions {
   grid-column: 1 / -1;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 6px;
   margin-top: 6px;
   padding-top: 8px;
@@ -296,6 +291,7 @@ button.danger:hover { background: rgba(239, 68, 68, 0.1); }
 }
 .row-edit .row-actions {
   grid-column: 1 !important;
+  justify-content: flex-end;
   margin-top: 4px;
   padding-top: 0;
   border-top: none;
@@ -322,20 +318,19 @@ select.filter {
 
 /* Custom date range */
 .custom-range {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 10px;
   align-items: center;
   margin-bottom: 12px;
 }
 .custom-range label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   color: var(--muted);
   font-size: 13px;
+  justify-self: start;
 }
 .custom-range input[type="date"] {
+  width: 100%;
   background: var(--bg-elev-2);
   color: var(--fg);
   border: 1px solid var(--border);

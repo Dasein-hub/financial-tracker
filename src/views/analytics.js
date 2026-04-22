@@ -88,8 +88,10 @@ export function renderAnalytics(root) {
         </select>
       </div>
       <div id="a-custom" class="custom-range" hidden>
-        <label>С <input id="a-from" type="date" /></label>
-        <label>По <input id="a-to" type="date" /></label>
+        <label for="a-from">С</label>
+        <input id="a-from" type="date" />
+        <label for="a-to">По</label>
+        <input id="a-to" type="date" />
       </div>
       <div id="a-total" class="total"></div>
       <div class="chart-grid">
