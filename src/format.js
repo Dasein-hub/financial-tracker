@@ -1,54 +1,40 @@
-const currencyFmt = new Intl.NumberFormat('ru-KZ', {
-  style: 'currency',
-  currency: 'KZT',
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 0,
-});
+const NBSP = ' ';
+const SHORT_MONTHS = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+const CHART_MONTHS = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 
-const dateFmt = new Intl.DateTimeFormat('ru-RU', {
-  year: 'numeric',
-  month: 'short',
-  day: 'numeric',
-});
-
-const dateTimeFmt = new Intl.DateTimeFormat('ru-RU', {
-  day: 'numeric',
-  month: 'short',
-  hour: 'numeric',
-  minute: '2-digit',
-});
-
-const pluralRecord = new Intl.PluralRules('ru-RU');
-
-const dayChartFmt = new Intl.DateTimeFormat('ru-RU', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-});
-const monthChartFmt = new Intl.DateTimeFormat('ru-RU', {
-  month: '2-digit',
-  year: 'numeric',
-});
-
-export const formatCurrency = (n) => currencyFmt.format(Number(n) || 0);
-export const formatDate = (t) => dateFmt.format(new Date(t));
-export const formatDateTime = (t) => dateTimeFmt.format(new Date(t));
-export const formatDayChart = (t) => dayChartFmt.format(new Date(t));
-export const formatMonthChart = (t) => monthChartFmt.format(new Date(t));
-
-export function recordsLabel(n) {
-  const r = pluralRecord.select(n);
-  return r === 'one' ? 'запись' : r === 'few' ? 'записи' : 'записей';
+export function fmtMoney(n) {
+  const v = Math.round(Number(n) || 0);
+  return v.toLocaleString('ru-RU').replace(/\s/g, NBSP) + NBSP + '₸';
 }
 
-export function monthKey(t) {
-  const d = new Date(t);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+export function fmtMoneyShort(n) {
+  const v = Math.round(Number(n) || 0);
+  if (v >= 1000) {
+    const digits = v >= 10000 ? 0 : 1;
+    return (v / 1000).toFixed(digits).replace('.', ',') + 'к';
+  }
+  return String(v);
 }
 
-export function dayKey(t) {
-  const d = new Date(t);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-    d.getDate(),
-  ).padStart(2, '0')}`;
+export function fmtTime(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const yest = new Date(now);
+  yest.setDate(yest.getDate() - 1);
+  const isYest = d.toDateString() === yest.toDateString();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  if (sameDay) return `Сегодня · ${hh}:${mm}`;
+  if (isYest) return `Вчера · ${hh}:${mm}`;
+  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} · ${hh}:${mm}`;
+}
+
+export function fmtDateInput(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export function chartMonthLabel(monthIndex) {
+  return CHART_MONTHS[monthIndex];
 }

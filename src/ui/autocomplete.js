@@ -1,13 +1,14 @@
 /**
- * Attach a keyboard-aware autocomplete dropdown to an input.
+ * Attach an autocomplete popover to an input.
  *
  * fetcher(query) -> Promise<Array<item>>
- * renderItem(item) -> string (HTML)
+ * renderItem(item, index) -> HTML string for one row (excludes outer button)
  * onSelect(item) -> void
+ * shouldShow?(currentValue, items) -> boolean (defaults to items.length > 0)
  */
-export function attachAutocomplete(input, { fetcher, renderItem, onSelect }) {
+export function attachAutocomplete(input, { fetcher, renderItem, onSelect, shouldShow }) {
   const wrap = document.createElement('div');
-  wrap.className = 'ac-dropdown';
+  wrap.className = 'ac-pop';
   wrap.hidden = true;
   input.parentElement.appendChild(wrap);
 
@@ -21,13 +22,18 @@ export function attachAutocomplete(input, { fetcher, renderItem, onSelect }) {
   };
 
   const render = () => {
+    const visible = shouldShow ? shouldShow(input.value, items) : items.length > 0;
+    if (!visible) {
+      close();
+      return;
+    }
     wrap.innerHTML = items
       .map(
         (item, i) =>
-          `<button type="button" class="ac-item${i === active ? ' is-active' : ''}" data-i="${i}">${renderItem(item)}</button>`,
+          `<div class="ac-item${i === active ? ' is-active' : ''}" data-i="${i}" role="option">${renderItem(item, i)}</div>`,
       )
       .join('');
-    wrap.hidden = items.length === 0;
+    wrap.hidden = false;
   };
 
   const select = (i) => {
@@ -50,8 +56,7 @@ export function attachAutocomplete(input, { fetcher, renderItem, onSelect }) {
   input.addEventListener('input', fetchNow);
   input.addEventListener('focus', fetchNow);
   input.addEventListener('blur', () => {
-    // delay so click on an item registers first
-    setTimeout(close, 120);
+    setTimeout(close, 140);
   });
   input.addEventListener('keydown', (e) => {
     if (wrap.hidden || items.length === 0) return;
@@ -74,10 +79,10 @@ export function attachAutocomplete(input, { fetcher, renderItem, onSelect }) {
   });
 
   wrap.addEventListener('mousedown', (e) => {
-    const btn = e.target.closest('.ac-item');
-    if (!btn) return;
+    const row = e.target.closest('.ac-item');
+    if (!row) return;
     e.preventDefault();
-    select(Number(btn.dataset.i));
+    select(Number(row.dataset.i));
   });
 
   return { close, refresh: fetchNow };

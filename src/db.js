@@ -65,70 +65,61 @@ export async function listExpenses({ from, to, textFilter } = {}) {
 }
 
 /**
- * Name-prefix search. Returns deduped (name, category, price) suggestions,
- * newest combo first.
+ * Name substring search, deduped by name, newest first.
+ * Returns up to `limit` entries (each with name, category, price).
  */
-export async function searchByName(prefix, limit = 8) {
+export async function searchByName(prefix, limit = 5) {
   const q = lower(prefix);
   if (!q) return [];
-  const rows = await db.expenses
-    .where('nameLower')
-    .startsWith(q)
-    .limit(200)
-    .toArray();
-  rows.sort((a, b) => b.createdAt - a.createdAt);
+  const rows = await db.expenses.orderBy('createdAt').reverse().toArray();
   const seen = new Set();
   const out = [];
   for (const r of rows) {
-    const key = `${r.nameLower}|${r.categoryLower}|${r.price}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    if (!r.nameLower.includes(q)) continue;
+    if (seen.has(r.nameLower)) continue;
+    seen.add(r.nameLower);
     out.push({ name: r.name, category: r.category, price: r.price });
     if (out.length >= limit) break;
   }
   return out;
 }
 
-/** Distinct category prefix search — category-only autofill. */
-export async function searchCategories(prefix, limit = 8) {
-  const q = lower(prefix);
-  if (!q) return [];
-  const keys = await db.expenses
-    .orderBy('categoryLower')
-    .uniqueKeys();
-  const matches = keys.filter((k) => typeof k === 'string' && k.startsWith(q));
-  if (matches.length === 0) return [];
-  // Get the display-cased category from the latest record for each key.
-  const out = [];
-  for (const k of matches.slice(0, limit)) {
-    const rec = await db.expenses
-      .where('categoryLower')
-      .equals(k)
-      .last();
-    if (rec) out.push(rec.category);
-  }
-  return out;
-}
-
 export async function exportJSON() {
   const rows = await db.expenses.orderBy('createdAt').toArray();
-  return JSON.stringify({ version: 1, exportedAt: Date.now(), expenses: rows }, null, 2);
+  return JSON.stringify(
+    { version: 1, exportedAt: Date.now(), expenses: rows },
+    null,
+    2,
+  );
 }
 
 export async function importJSON(text) {
   const data = JSON.parse(text);
-  if (!data || !Array.isArray(data.expenses)) throw new Error('Invalid file');
-  const rows = data.expenses.map((r) => ({
-    name: norm(r.name),
-    nameLower: lower(r.name),
-    category: norm(r.category),
-    categoryLower: lower(r.category),
-    price: Number(r.price),
-    createdAt: Number(r.createdAt) || Date.now(),
-  }));
+  const list = Array.isArray(data) ? data : data?.expenses;
+  if (!Array.isArray(list)) throw new Error('Invalid file');
+  const rows = list.map((r) => {
+    const ts = Number(r.createdAt ?? r.ts) || Date.now();
+    return {
+      name: norm(r.name),
+      nameLower: lower(r.name),
+      category: norm(r.category),
+      categoryLower: lower(r.category),
+      price: Number(r.price),
+      createdAt: ts,
+    };
+  });
   await db.transaction('rw', db.expenses, async () => {
     await db.expenses.clear();
     await db.expenses.bulkAdd(rows);
   });
   return rows.length;
+}
+
+export async function countExpenses() {
+  return db.expenses.count();
+}
+
+export async function sumExpenses() {
+  const rows = await db.expenses.toArray();
+  return rows.reduce((s, r) => s + (Number(r.price) || 0), 0);
 }

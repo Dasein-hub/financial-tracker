@@ -1,112 +1,164 @@
-import { listExpenses, updateExpense, deleteExpense } from '../db.js';
-import { formatCurrency, formatDateTime } from '../format.js';
+import { deleteExpense, listExpenses, updateExpense } from '../db.js';
+import { attachAutocomplete } from '../ui/autocomplete.js';
+import { CATEGORIES, CAT_COLORS } from '../data.js';
+import { entryRow } from '../ui/entry-row.js';
+import { escapeHtml } from '../ui/escape.js';
+import { icon } from '../ui/icons.js';
+import { fmtMoney } from '../format.js';
+import { confirmDialog } from '../ui/confirm.js';
+import { toast } from '../ui/toast.js';
 
-export function renderHistory(root, { onDataChange, toast }) {
+export function renderHistory(root, { onDataChange }) {
   root.innerHTML = `
-    <section class="card">
-      <div class="row">
-        <h2>История</h2>
-        <input id="h-filter" class="filter" type="search" placeholder="Поиск по названию или категории" />
+    <section class="card is-flush">
+      <div class="history-head">
+        <div class="history-title">
+          Все расходы · <span class="count" id="h-count">0</span>
+        </div>
+        <div class="search-pill">
+          ${icon('search', { size: 13 })}
+          <input id="h-search" type="search" placeholder="Поиск" />
+          <button type="button" class="search-clear" id="h-clear" hidden aria-label="Очистить">${icon('x', { size: 13 })}</button>
+        </div>
       </div>
       <ul id="history-list" class="history-list"></ul>
     </section>
   `;
 
+  const countEl = root.querySelector('#h-count');
+  const searchEl = root.querySelector('#h-search');
+  const clearBtn = root.querySelector('#h-clear');
   const list = root.querySelector('#history-list');
-  const filter = root.querySelector('#h-filter');
 
   let rows = [];
   let editing = null;
+  let editAttached = null;
 
   async function refresh() {
-    rows = await listExpenses({ textFilter: filter.value.trim() });
+    rows = await listExpenses({ textFilter: searchEl.value.trim() });
     render();
   }
 
   function render() {
+    // keep total count independent of filter — fetch once
+    clearBtn.hidden = !searchEl.value;
     if (rows.length === 0) {
-      list.innerHTML = `<li class="empty">Совпадений не найдено.</li>`;
+      list.innerHTML = `<li class="empty is-tall">${searchEl.value ? 'Ничего не найдено' : 'Список пуст'}</li>`;
       return;
     }
-    list.innerHTML = rows.map(renderRow).join('');
+    list.innerHTML = rows
+      .map((r) => (editing === r.id ? editRowHtml(r) : entryRow(r, { actions: true })))
+      .join('');
+    if (editing != null) attachEditHandlers();
   }
 
-  function renderRow(r) {
-    if (editing === r.id) {
-      return `
-        <li class="row-edit" data-id="${r.id}">
-          <input class="e-name" value="${escapeAttr(r.name)}" />
-          <input class="e-cat"  value="${escapeAttr(r.category)}" />
-          <input class="e-price" type="number" step="1" min="0" value="${r.price}" />
-          <div class="row-actions">
-            <button class="save">Сохранить</button>
-            <button class="cancel">Отмена</button>
-          </div>
-        </li>`;
-    }
+  async function refreshTotalCount() {
+    const all = await listExpenses();
+    countEl.textContent = all.length.toLocaleString('ru-RU');
+  }
+
+  function editRowHtml(r) {
     return `
-      <li data-id="${r.id}">
-        <div class="entry-main">
-          <strong>${escape(r.name)}</strong>
-          <span class="badge">${escape(r.category)}</span>
+      <li class="edit-row" data-id="${r.id}">
+        <input class="field-input is-compact e-name" value="${escapeHtml(r.name)}" placeholder="Название" />
+        <div class="ac-wrap">
+          <input class="field-input is-compact e-cat" value="${escapeHtml(r.category)}" placeholder="Категория" />
         </div>
-        <div class="entry-side">
-          <span class="price">${formatCurrency(r.price)}</span>
-          <span class="when">${formatDateTime(r.createdAt)}</span>
+        <input class="field-input is-compact is-numeric e-price" inputmode="decimal" value="${r.price}" placeholder="Цена, ₸" />
+        <div class="btn-row">
+          <button type="button" class="btn-secondary is-compact" data-action="cancel">Отмена</button>
+          <button type="button" class="btn-primary is-compact" data-action="save">${icon('check', { size: 14, strokeWidth: 2.4 })}Сохранить</button>
         </div>
-        <div class="row-actions">
-          <button class="edit" aria-label="Изменить">Изменить</button>
-          <button class="del"  aria-label="Удалить">Удалить</button>
+      </li>
+    `;
+  }
+
+  function attachEditHandlers() {
+    if (editAttached) {
+      editAttached.close();
+      editAttached = null;
+    }
+    const li = list.querySelector('.edit-row');
+    if (!li) return;
+    const catInput = li.querySelector('.e-cat');
+    editAttached = attachAutocomplete(catInput, {
+      fetcher: async (q) => {
+        const needle = q.trim().toLowerCase();
+        return CATEGORIES.filter((c) => !needle || c.toLowerCase().includes(needle));
+      },
+      shouldShow: (value, items) => items.length > 0 && !CATEGORIES.includes(value.trim()),
+      renderItem: (c) => `
+        <div class="ac-cat-row">
+          <span class="dot" style="background:${CAT_COLORS[c]}"></span>
+          <span class="name">${escapeHtml(c)}</span>
         </div>
-      </li>`;
+      `,
+      onSelect: (c) => {
+        catInput.value = c;
+      },
+    });
   }
 
   list.addEventListener('click', async (e) => {
     const li = e.target.closest('li[data-id]');
     if (!li) return;
     const id = Number(li.dataset.id);
-    if (e.target.classList.contains('edit')) {
+    const actionEl = e.target.closest('[data-action]');
+    const action = actionEl?.dataset.action;
+    if (action === 'edit') {
       editing = id;
       render();
-    } else if (e.target.classList.contains('cancel')) {
+      return;
+    }
+    if (action === 'cancel') {
       editing = null;
       render();
-    } else if (e.target.classList.contains('save')) {
+      return;
+    }
+    if (action === 'save') {
       const name = li.querySelector('.e-name').value.trim();
       const category = li.querySelector('.e-cat').value.trim();
-      const price = Number(li.querySelector('.e-price').value);
-      if (!name || !category || !Number.isFinite(price)) {
-        toast('Некорректные значения.');
+      const price = parseFloat(li.querySelector('.e-price').value.replace(',', '.'));
+      if (!name || !category || !Number.isFinite(price) || price <= 0) {
+        toast('Некорректные значения.', 'err');
         return;
       }
       await updateExpense(id, { name, category, price });
       editing = null;
       await refresh();
       onDataChange?.();
-      toast('Обновлено.');
-    } else if (e.target.classList.contains('del')) {
-      if (!confirm('Удалить запись?')) return;
+      toast('Обновлено.', 'ok');
+      return;
+    }
+    if (action === 'delete') {
+      const row = rows.find((r) => r.id === id);
+      if (!row) return;
+      const ok = await confirmDialog({
+        title: 'Удалить запись?',
+        body: `«${row.name}» — ${fmtMoney(row.price)}. Это действие нельзя отменить.`,
+        confirmLabel: 'Удалить',
+        danger: true,
+      });
+      if (!ok) return;
       await deleteExpense(id);
       await refresh();
+      await refreshTotalCount();
       onDataChange?.();
-      toast('Удалено.');
+      toast('Удалено.', 'ok');
     }
   });
 
-  filter.addEventListener('input', () => {
+  searchEl.addEventListener('input', () => {
+    refresh();
+  });
+
+  clearBtn.addEventListener('click', () => {
+    searchEl.value = '';
+    clearBtn.hidden = true;
+    searchEl.focus();
     refresh();
   });
 
   refresh();
+  refreshTotalCount();
 }
-
-function escape(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  })[c]);
-}
-const escapeAttr = escape;

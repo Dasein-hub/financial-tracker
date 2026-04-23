@@ -12,11 +12,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons/icon-192.png', 'icons/icon-512.png'],
       manifest: {
-        name: 'Учёт расходов',
+        name: 'Расходы',
         short_name: 'Расходы',
         description: 'Офлайн-трекер расходов с аналитикой.',
         lang: 'ru',
-        theme_color: '#4f46e5',
+        theme_color: '#0b1020',
         background_color: '#0b1020',
         display: 'standalone',
         start_url: '.',

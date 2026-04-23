@@ -6,37 +6,48 @@ import { renderSettings } from './views/settings.js';
 
 registerSW({ immediate: true });
 
+const TAB_KEY = 'tab';
 const view = document.getElementById('view');
-const toastEl = document.getElementById('toast');
 const tabs = document.querySelectorAll('.tab');
 
 let cleanup = null;
-let active = 'add';
-
-const toast = (msg) => {
-  toastEl.textContent = msg;
-  toastEl.classList.add('show');
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => toastEl.classList.remove('show'), 1800);
-};
-
-const onDataChange = () => {
-  // Re-render analytics only if it's the active view — others query live.
-  if (active === 'analytics') navigate('analytics');
-};
+let active = null;
 
 function navigate(tabName) {
+  if (active === tabName) return;
   active = tabName;
-  tabs.forEach((t) => t.setAttribute('aria-selected', t.dataset.tab === tabName ? 'true' : 'false'));
+  tabs.forEach((t) => {
+    const on = t.dataset.tab === tabName;
+    t.classList.toggle('is-active', on);
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
   if (typeof cleanup === 'function') cleanup();
   cleanup = null;
   view.innerHTML = '';
-  const ctx = { onDataChange, toast };
+  view.scrollTop = 0;
+  const ctx = { onDataChange };
+
   if (tabName === 'add') renderAdd(view, ctx);
   else if (tabName === 'history') renderHistory(view, ctx);
   else if (tabName === 'analytics') cleanup = renderAnalytics(view);
   else if (tabName === 'settings') renderSettings(view, ctx);
+
+  try {
+    localStorage.setItem(TAB_KEY, tabName);
+  } catch {}
+}
+
+function onDataChange() {
+  if (active === 'analytics') navigate('analytics');
 }
 
 tabs.forEach((t) => t.addEventListener('click', () => navigate(t.dataset.tab)));
-navigate('add');
+
+const initial = (() => {
+  try {
+    const saved = localStorage.getItem(TAB_KEY);
+    if (['add', 'history', 'analytics', 'settings'].includes(saved)) return saved;
+  } catch {}
+  return 'add';
+})();
+navigate(initial);
