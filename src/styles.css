@@ -597,7 +597,9 @@ input, textarea, select, button {
   gap: 8px;
   margin-bottom: 10px;
 }
-.range-custom > div { flex: 1; }
+.range-custom[hidden] { display: none; }
+.range-custom > .field { flex: 1; min-width: 0; }
+.range-custom > .field + .field { margin-top: 0; }
 
 .range-summary {
   display: flex;

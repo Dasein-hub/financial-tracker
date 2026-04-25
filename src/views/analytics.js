@@ -93,19 +93,14 @@ function aggByTime(rows, from, to) {
 }
 
 function aggByMonth(rows) {
-  const m = new Map();
+  const year = new Date().getFullYear();
+  const totals = new Array(12).fill(0);
   for (const e of rows) {
     const d = new Date(e.createdAt);
-    const k = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
-    m.set(k, (m.get(k) || 0) + e.price);
+    if (d.getFullYear() !== year) continue;
+    totals[d.getMonth()] += e.price;
   }
-  return [...m.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-6)
-    .map(([k, v]) => {
-      const [, mm] = k.split('-');
-      return { label: MONTHS[parseInt(mm, 10)], value: v };
-    });
+  return totals.map((value, i) => ({ label: MONTHS[i], value }));
 }
 
 function aggTopItems(rows) {
@@ -119,33 +114,48 @@ function aggTopItems(rows) {
 // ─────────────── Chart renderers (SVG strings)
 
 function doughnutSvg(data, { big = false } = {}) {
-  const total = data.reduce((s, d) => s + d.value, 0);
+  const segments = data.filter((d) => d.value > 0);
+  const total = segments.reduce((s, d) => s + d.value, 0);
   if (total === 0) return emptySvg(big);
   const r = 44, rIn = 30, cx = 60, cy = 60;
-  let acc = 0;
-  const paths = data.map((d) => {
-    const frac = d.value / total;
-    const a0 = acc * Math.PI * 2 - Math.PI / 2;
-    acc += frac;
-    const a1 = acc * Math.PI * 2 - Math.PI / 2;
-    const large = frac > 0.5 ? 1 : 0;
-    const p = (a, R) => [cx + Math.cos(a) * R, cy + Math.sin(a) * R];
-    const [x0, y0] = p(a0, r);
-    const [x1, y1] = p(a1, r);
-    const [ix1, iy1] = p(a1, rIn);
-    const [ix0, iy0] = p(a0, rIn);
-    const d2 = `M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1} L ${ix1} ${iy1} A ${rIn} ${rIn} 0 ${large} 0 ${ix0} ${iy0} Z`;
-    return `<path d="${d2}" fill="${d.color}" />`;
-  });
   const totalTxt = escapeHtml(fmtMoneyShort(total));
   const centerTopSize = big ? 9 : 11;
   const centerBotSize = big ? 11 : 12;
+  const centerText = `
+    <text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="${centerTopSize}" fill="#94a3b8">всего</text>
+    <text x="${cx}" y="${cy + (big ? 11 : 12)}" text-anchor="middle" font-size="${centerBotSize}" font-weight="700" fill="#f1f5f9">${totalTxt}</text>
+  `;
+
+  let body;
+  if (segments.length === 1) {
+    const ringR = (r + rIn) / 2;
+    const ringW = r - rIn;
+    body = `<circle cx="${cx}" cy="${cy}" r="${ringR}" fill="none" stroke="${segments[0].color}" stroke-width="${ringW}" />`;
+  } else {
+    let acc = 0;
+    body = segments
+      .map((d) => {
+        const frac = d.value / total;
+        const a0 = acc * Math.PI * 2 - Math.PI / 2;
+        acc += frac;
+        const a1 = acc * Math.PI * 2 - Math.PI / 2;
+        const large = frac > 0.5 ? 1 : 0;
+        const p = (a, R) => [cx + Math.cos(a) * R, cy + Math.sin(a) * R];
+        const [x0, y0] = p(a0, r);
+        const [x1, y1] = p(a1, r);
+        const [ix1, iy1] = p(a1, rIn);
+        const [ix0, iy0] = p(a0, rIn);
+        const path = `M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1} L ${ix1} ${iy1} A ${rIn} ${rIn} 0 ${large} 0 ${ix0} ${iy0} Z`;
+        return `<path d="${path}" fill="${d.color}" />`;
+      })
+      .join('');
+  }
+
   return `
     <svg viewBox="0 0 120 120" preserveAspectRatio="xMidYMid meet"
          style="width:100%;height:${big ? '100%' : '140px'}">
-      ${paths.join('')}
-      <text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="${centerTopSize}" fill="#94a3b8">всего</text>
-      <text x="${cx}" y="${cy + (big ? 11 : 12)}" text-anchor="middle" font-size="${centerBotSize}" font-weight="700" fill="#f1f5f9">${totalTxt}</text>
+      ${body}
+      ${centerText}
     </svg>
   `;
 }
@@ -451,14 +461,17 @@ export function renderAnalytics(root) {
     renderPills();
     customEl.hidden = range !== 'custom';
     const [lo, hi] = rangeBounds(range, fromEl.value, toEl.value);
-    const filtered = await listExpenses({ from: lo, to: hi });
+    const [filtered, all] = await Promise.all([
+      listExpenses({ from: lo, to: hi }),
+      listExpenses(),
+    ]);
     const total = filtered.reduce((s, r) => s + r.price, 0);
     countEl.textContent = filtered.length.toLocaleString('ru-RU');
     totalEl.textContent = fmtMoney(total);
 
     const byCat = aggByCategory(filtered);
     const byTime = aggByTime(filtered, lo, hi);
-    const byMonth = aggByMonth(filtered);
+    const byMonth = aggByMonth(all);
     const topItems = aggTopItems(filtered);
 
     root.querySelector('#ch-cat').innerHTML = doughnutSvg(byCat);
