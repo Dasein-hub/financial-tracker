@@ -1,7 +1,14 @@
-import { addExpense, listExpenses, searchByName } from '../db.js';
+import {
+  addExpense,
+  colorForCategory,
+  listExpenses,
+  searchByName,
+  searchCategories,
+} from '../db.js';
 import { attachAutocomplete } from '../ui/autocomplete.js';
+import { attachColorPicker } from '../ui/color-picker.js';
 import { fmtMoney } from '../format.js';
-import { CATEGORIES, CAT_COLORS } from '../data.js';
+import { DEFAULT_COLOR, colorFor } from '../data.js';
 import { entryRow } from '../ui/entry-row.js';
 import { escapeHtml } from '../ui/escape.js';
 import { icon } from '../ui/icons.js';
@@ -20,8 +27,13 @@ export function renderAdd(root, { onDataChange }) {
           </div>
           <div class="field">
             <label class="field-label" for="f-category">Категория</label>
-            <div class="ac-wrap">
-              <input id="f-category" class="field-input" type="text" placeholder="Например, Продукты" required />
+            <div class="cat-row">
+              <div class="ac-wrap">
+                <input id="f-category" class="field-input" type="text" placeholder="Например, Кофе" required />
+              </div>
+              <div class="color-picker">
+                <button type="button" class="swatch-btn" aria-label="Цвет категории"></button>
+              </div>
             </div>
           </div>
           <div class="field">
@@ -52,6 +64,20 @@ export function renderAdd(root, { onDataChange }) {
   const form = root.querySelector('#entry-form');
   const recentList = root.querySelector('#recent-list');
   const recentMeta = root.querySelector('#recent-meta');
+  const colorHost = root.querySelector('.color-picker');
+
+  const picker = attachColorPicker(colorHost, {
+    initialColor: DEFAULT_COLOR,
+    onChange: () => {
+      colorTouched = true;
+    },
+  });
+  let colorTouched = false;
+
+  const setColor = (c, { explicit = false } = {}) => {
+    picker.setColor(c);
+    if (explicit) colorTouched = true;
+  };
 
   const setError = (msg) => {
     if (msg) {
@@ -70,36 +96,46 @@ export function renderAdd(root, { onDataChange }) {
         <span class="name">${escapeHtml(it.name)}</span>
         <span class="price">${fmtMoney(it.price)}</span>
       </div>
-      <div class="ac-item-cat">${escapeHtml(it.category)}</div>
+      <div class="ac-item-cat">
+        <span class="ac-cat-dot" style="background:${colorFor(it.category, it.color)}"></span>
+        ${escapeHtml(it.category)}
+      </div>
     `,
     onSelect: (it) => {
       nameInput.value = it.name;
       catInput.value = it.category;
       priceInput.value = String(it.price);
+      setColor(colorFor(it.category, it.color), { explicit: true });
       priceInput.focus();
     },
   });
 
   attachAutocomplete(catInput, {
-    fetcher: async (q) => {
-      const needle = q.trim().toLowerCase();
-      return CATEGORIES.filter((c) => !needle || c.toLowerCase().includes(needle));
-    },
-    shouldShow: (value, list) => {
-      if (list.length === 0) return false;
-      // Hide popover when the input already matches a canonical category exactly.
-      return !CATEGORIES.includes(value.trim());
-    },
-    renderItem: (c) => `
+    fetcher: (q) => searchCategories(q, 8),
+    shouldShow: (_value, items) => items.length > 0,
+    renderItem: (it) => `
       <div class="ac-cat-row">
-        <span class="dot" style="background:${CAT_COLORS[c]}"></span>
-        <span class="name">${escapeHtml(c)}</span>
+        <span class="dot" style="background:${colorFor(it.category, it.color)}"></span>
+        <span class="name">${escapeHtml(it.category)}</span>
       </div>
     `,
-    onSelect: (c) => {
-      catInput.value = c;
+    onSelect: (it) => {
+      catInput.value = it.category;
+      setColor(colorFor(it.category, it.color), { explicit: true });
       priceInput.focus();
     },
+  });
+
+  // If the user types a category name that exactly matches an existing one,
+  // pull in its colour automatically (unless they've explicitly picked a colour).
+  let categoryLookup = 0;
+  catInput.addEventListener('input', async () => {
+    if (colorTouched) return;
+    const value = catInput.value.trim();
+    const myId = ++categoryLookup;
+    const existing = value ? await colorForCategory(value) : null;
+    if (myId !== categoryLookup) return;
+    picker.setColor(existing || DEFAULT_COLOR);
   });
 
   form.addEventListener('submit', async (e) => {
@@ -112,8 +148,17 @@ export function renderAdd(root, { onDataChange }) {
     if (!category) return setError('Укажите категорию');
     if (!Number.isFinite(price) || price <= 0) return setError('Укажите цену');
     setError('');
-    await addExpense({ name, category, price });
+
+    let color = picker.getColor();
+    if (!colorTouched) {
+      const existing = await colorForCategory(category);
+      if (existing) color = existing;
+    }
+
+    await addExpense({ name, category, price, color });
     form.reset();
+    colorTouched = false;
+    picker.setColor(DEFAULT_COLOR);
     nameInput.focus();
     toast('Добавлено.', 'ok');
     await refreshRecent();

@@ -1,5 +1,5 @@
 import { listExpenses } from '../db.js';
-import { CAT_COLORS, PALETTE } from '../data.js';
+import { PALETTE, colorFor } from '../data.js';
 import { fmtDateInput, fmtMoney, fmtMoneyShort } from '../format.js';
 import { escapeHtml } from '../ui/escape.js';
 import { icon } from '../ui/icons.js';
@@ -57,11 +57,20 @@ function rangeBounds(id, customFrom, customTo) {
 // ─────────────── Aggregators
 
 function aggByCategory(rows) {
-  const m = new Map();
-  for (const e of rows) m.set(e.category, (m.get(e.category) || 0) + e.price);
-  return [...m.entries()]
+  const totals = new Map();
+  const colors = new Map();
+  // rows are newest-first, so the first colour we see for each category wins.
+  for (const e of rows) {
+    totals.set(e.category, (totals.get(e.category) || 0) + e.price);
+    if (!colors.has(e.category) && e.color) colors.set(e.category, e.color);
+  }
+  return [...totals.entries()]
     .sort((a, b) => b[1] - a[1])
-    .map(([label, value]) => ({ label, value, color: CAT_COLORS[label] || '#6366f1' }));
+    .map(([label, value]) => ({
+      label,
+      value,
+      color: colorFor(label, colors.get(label)),
+    }));
 }
 
 function aggByTime(rows, from, to) {

@@ -8,7 +8,7 @@ db.version(1).stores({
 const norm = (s) => String(s ?? '').trim();
 const lower = (s) => norm(s).toLowerCase();
 
-export async function addExpense({ name, category, price }) {
+export async function addExpense({ name, category, price, color }) {
   const n = norm(name);
   const c = norm(category);
   const p = Number(price);
@@ -19,6 +19,7 @@ export async function addExpense({ name, category, price }) {
     category: c,
     categoryLower: c.toLowerCase(),
     price: p,
+    color: color || undefined,
     createdAt: Date.now(),
   });
 }
@@ -34,6 +35,7 @@ export async function updateExpense(id, patch) {
     next.categoryLower = next.category.toLowerCase();
   }
   if (patch.price != null) next.price = Number(patch.price);
+  if (patch.color !== undefined) next.color = patch.color || undefined;
   return db.expenses.update(id, next);
 }
 
@@ -66,7 +68,6 @@ export async function listExpenses({ from, to, textFilter } = {}) {
 
 /**
  * Name substring search, deduped by name, newest first.
- * Returns up to `limit` entries (each with name, category, price).
  */
 export async function searchByName(prefix, limit = 5) {
   const q = lower(prefix);
@@ -78,10 +79,47 @@ export async function searchByName(prefix, limit = 5) {
     if (!r.nameLower.includes(q)) continue;
     if (seen.has(r.nameLower)) continue;
     seen.add(r.nameLower);
-    out.push({ name: r.name, category: r.category, price: r.price });
+    out.push({
+      name: r.name,
+      category: r.category,
+      price: r.price,
+      color: r.color,
+    });
     if (out.length >= limit) break;
   }
   return out;
+}
+
+/**
+ * Category substring search, deduped by category, newest-first.
+ * Each result carries the most-recent colour seen for that category.
+ */
+export async function searchCategories(prefix, limit = 5) {
+  const q = lower(prefix);
+  const rows = await db.expenses.orderBy('createdAt').reverse().toArray();
+  const seen = new Set();
+  const out = [];
+  for (const r of rows) {
+    if (q && !r.categoryLower.includes(q)) continue;
+    if (seen.has(r.categoryLower)) continue;
+    seen.add(r.categoryLower);
+    out.push({ category: r.category, color: r.color });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/** Look up the most-recent colour stored for a category (case-insensitive). */
+export async function colorForCategory(category) {
+  const key = lower(category);
+  if (!key) return null;
+  const row = await db.expenses
+    .where('categoryLower')
+    .equals(key)
+    .reverse()
+    .sortBy('createdAt')
+    .then((rows) => rows.find((r) => r.color));
+  return row?.color || null;
 }
 
 export async function exportJSON() {
@@ -105,6 +143,7 @@ export async function importJSON(text) {
       category: norm(r.category),
       categoryLower: lower(r.category),
       price: Number(r.price),
+      color: r.color || undefined,
       createdAt: ts,
     };
   });

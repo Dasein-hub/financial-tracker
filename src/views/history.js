@@ -1,6 +1,13 @@
-import { deleteExpense, listExpenses, updateExpense } from '../db.js';
+import {
+  colorForCategory,
+  deleteExpense,
+  listExpenses,
+  searchCategories,
+  updateExpense,
+} from '../db.js';
 import { attachAutocomplete } from '../ui/autocomplete.js';
-import { CATEGORIES, CAT_COLORS } from '../data.js';
+import { attachColorPicker } from '../ui/color-picker.js';
+import { DEFAULT_COLOR, colorFor } from '../data.js';
 import { entryRow } from '../ui/entry-row.js';
 import { escapeHtml } from '../ui/escape.js';
 import { icon } from '../ui/icons.js';
@@ -32,7 +39,7 @@ export function renderHistory(root, { onDataChange }) {
 
   let rows = [];
   let editing = null;
-  let editAttached = null;
+  let editCleanup = null;
 
   async function refresh() {
     rows = await listExpenses({ textFilter: searchEl.value.trim() });
@@ -40,8 +47,11 @@ export function renderHistory(root, { onDataChange }) {
   }
 
   function render() {
-    // keep total count independent of filter — fetch once
     clearBtn.hidden = !searchEl.value;
+    if (editCleanup) {
+      editCleanup();
+      editCleanup = null;
+    }
     if (rows.length === 0) {
       list.innerHTML = `<li class="empty is-tall">${searchEl.value ? 'Ничего не найдено' : 'Список пуст'}</li>`;
       return;
@@ -61,8 +71,13 @@ export function renderHistory(root, { onDataChange }) {
     return `
       <li class="edit-row" data-id="${r.id}">
         <input class="field-input is-compact e-name" value="${escapeHtml(r.name)}" placeholder="Название" />
-        <div class="ac-wrap">
-          <input class="field-input is-compact e-cat" value="${escapeHtml(r.category)}" placeholder="Категория" />
+        <div class="cat-row">
+          <div class="ac-wrap">
+            <input class="field-input is-compact e-cat" value="${escapeHtml(r.category)}" placeholder="Категория" />
+          </div>
+          <div class="color-picker color-picker-compact">
+            <button type="button" class="swatch-btn" aria-label="Цвет категории"></button>
+          </div>
         </div>
         <input class="field-input is-compact is-numeric e-price" inputmode="decimal" value="${r.price}" placeholder="Цена, ₸" />
         <div class="btn-row">
@@ -74,29 +89,54 @@ export function renderHistory(root, { onDataChange }) {
   }
 
   function attachEditHandlers() {
-    if (editAttached) {
-      editAttached.close();
-      editAttached = null;
-    }
     const li = list.querySelector('.edit-row');
     if (!li) return;
     const catInput = li.querySelector('.e-cat');
-    editAttached = attachAutocomplete(catInput, {
-      fetcher: async (q) => {
-        const needle = q.trim().toLowerCase();
-        return CATEGORIES.filter((c) => !needle || c.toLowerCase().includes(needle));
-      },
-      shouldShow: (value, items) => items.length > 0 && !CATEGORIES.includes(value.trim()),
-      renderItem: (c) => `
-        <div class="ac-cat-row">
-          <span class="dot" style="background:${CAT_COLORS[c]}"></span>
-          <span class="name">${escapeHtml(c)}</span>
-        </div>
-      `,
-      onSelect: (c) => {
-        catInput.value = c;
+    const colorHost = li.querySelector('.color-picker');
+    const editingRow = rows.find((r) => r.id === editing);
+    const initial = colorFor(editingRow?.category, editingRow?.color);
+
+    let colorTouched = false;
+    const picker = attachColorPicker(colorHost, {
+      initialColor: initial,
+      onChange: () => {
+        colorTouched = true;
       },
     });
+
+    const ac = attachAutocomplete(catInput, {
+      fetcher: (q) => searchCategories(q, 8),
+      shouldShow: (_value, items) => items.length > 0,
+      renderItem: (it) => `
+        <div class="ac-cat-row">
+          <span class="dot" style="background:${colorFor(it.category, it.color)}"></span>
+          <span class="name">${escapeHtml(it.category)}</span>
+        </div>
+      `,
+      onSelect: (it) => {
+        catInput.value = it.category;
+        picker.setColor(colorFor(it.category, it.color));
+        colorTouched = true;
+      },
+    });
+
+    let lookupId = 0;
+    catInput.addEventListener('input', async () => {
+      if (colorTouched) return;
+      const value = catInput.value.trim();
+      const myId = ++lookupId;
+      const existing = value ? await colorForCategory(value) : null;
+      if (myId !== lookupId) return;
+      picker.setColor(existing || initial);
+    });
+
+    li._getColor = () => picker.getColor();
+    li._wasColorTouched = () => colorTouched;
+
+    editCleanup = () => {
+      ac.close();
+      picker.close();
+    };
   }
 
   list.addEventListener('click', async (e) => {
@@ -123,7 +163,12 @@ export function renderHistory(root, { onDataChange }) {
         toast('Некорректные значения.', 'err');
         return;
       }
-      await updateExpense(id, { name, category, price });
+      let color = li._getColor?.();
+      if (!li._wasColorTouched?.()) {
+        const existing = await colorForCategory(category);
+        if (existing) color = existing;
+      }
+      await updateExpense(id, { name, category, price, color });
       editing = null;
       await refresh();
       onDataChange?.();

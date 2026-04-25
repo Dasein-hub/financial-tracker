@@ -14,7 +14,7 @@ export function entryRow(entry, { actions = false, compact = false } = {}) {
     <li class="entry-row${compact ? ' is-compact' : ''}" data-id="${entry.id}">
       <div class="entry-main">
         <div class="entry-name">${escapeHtml(entry.name)}</div>
-        ${catBadge(entry.category)}
+        ${catBadge(entry.category, entry.color)}
       </div>
       <div class="entry-side">
         <div class="entry-price">${fmtMoney(entry.price)}</div>
