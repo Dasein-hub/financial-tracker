@@ -160,9 +160,9 @@ function doughnutSvg(data, { big = false } = {}) {
       .join('');
   }
 
+  const sizeStyle = big ? '' : 'style="width:100%;height:140px"';
   return `
-    <svg viewBox="0 0 120 120" preserveAspectRatio="xMidYMid meet"
-         style="width:100%;height:${big ? '100%' : '140px'}">
+    <svg class="${big ? 'fs-doughnut-svg' : ''}" viewBox="0 0 120 120" preserveAspectRatio="xMidYMid meet" ${sizeStyle}>
       ${body}
       ${centerText}
     </svg>
@@ -299,19 +299,20 @@ function doughnutLegendHtml(data) {
   const total = data.reduce((s, d) => s + d.value, 0);
   if (total === 0) return '';
   return `
-    <div class="legend-grid">
+    <ul class="legend-list">
       ${data
         .map(
           (d) => `
-        <div class="legend-item">
-          <span class="swatch" style="background:${d.color}"></span>
-          <span class="legend-label">${escapeHtml(d.label)}</span>
+        <li class="legend-row">
+          <span class="legend-swatch" style="background:${d.color}"></span>
+          <span class="legend-name">${escapeHtml(d.label)}</span>
+          <span class="legend-value">${escapeHtml(fmtMoney(d.value))}</span>
           <span class="legend-pct">${Math.round((d.value / total) * 100)}%</span>
-        </div>
+        </li>
       `,
         )
         .join('')}
-    </div>
+    </ul>
   `;
 }
 
